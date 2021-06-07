@@ -1,0 +1,7 @@
+# User-specific uVision Keil files
+/MDK-ARM/DebugConfig
+/MDK-ARM/STM32L476VG_DB
+/MDK-ARM/JLinkLog.txt
+MDK-ARM/JLinkSettings.ini
+MDK-ARM/*.uvguix*
+/.vscode
