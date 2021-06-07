@@ -1,10 +1,14 @@
 #include <string.h>
+#include "stdlib.h"
+#include "common.h"
 #include "app.h"
 #include "usart.h"
 #include "gpio.h"
 #include "lorawan_node_driver.h"
 #include "hdc1000.h"
 #include "sensors_test.h"
+#include "opt3001.h"
+#include "mpl3115.h"
 
 
 extern DEVICE_MODE_T device_mode;
@@ -16,10 +20,26 @@ uint8_t appKEY[]="AT+APPKEY=7054061A8CA122107F6F8FF3FCE2DDC2,0\r\n";
 uint8_t appclassc[]="AT+CLASS=2\r\nAT+CONFIRM=1\r\nAT+SAVE\r\n";
 uint8_t timesync[]="AT+TIMESYNC\r\n";
 
+//0:未收到; 1:仅收到帧头; 2:收到合法控制指令; 3:收到帧头帧尾但是长度不对; 
+//4:收到的不是控制指令;
+uint8_t cmd_check = 0;  
+
+//0:不自动上报; 1:立即上报一次; 2:每分钟上报数据;
+uint8_t Data_Up = 0;
+
+uint8_t send_buf[13];
+
 uint8_t time[30];
 uint8_t local_time[6];
 uint32_t gettimetick;
 uint32_t tickcount;
+
+char  buffer [33];
+
+float get_temp;   //温度
+float get_lux;    //光照
+float get_humi;   //湿度
+float get_Press;  //气压
 
 void SetLocalTime(uint8_t time[30]);
 
@@ -183,6 +203,72 @@ void LoRaWAN_Func_Process(void)
         {
            
         }
+				
+				/*获取传感器温度、亮度、湿度、气压*/
+				get_temp = HDC1000_Read_Temper() / 1000.0;
+				get_lux = OPT3001_Get_Lux();
+				get_humi = HDC1000_Read_Humidi() / 1000.0;
+				get_Press = MPL3115_ReadPressure() / 100000.0;
+				
+				if(UART_TO_LRM_RECEIVE_FLAG)
+				{
+					UART_TO_LRM_RECEIVE_FLAG = 0;
+					usart2_send_data(UART_TO_LRM_RECEIVE_BUFFER,UART_TO_LRM_RECEIVE_LENGTH);
+					cmd_check = 4;
+					
+					if(UART_TO_LRM_RECEIVE_BUFFER[0] == 0xBB)
+					{
+						cmd_check = 1;
+						
+						if(UART_TO_LRM_RECEIVE_BUFFER[3] == 0x0F)
+						{
+							cmd_check = 2;
+							if(UART_TO_LRM_RECEIVE_LENGTH != 4)
+								cmd_check = 3;
+						}
+						
+						switch(cmd_check)
+						{
+							case 1:
+								debug_printf("帧尾错误\r\n");
+								break;
+							case 2:
+								if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x00)
+									Data_Up = 1;
+								if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x01)
+									Data_Up = 2;
+								break;
+							case 3:
+								debug_printf("指令长度错误\r\n");
+								break;
+							case 4:
+								debug_printf("帧头错误\r\n");
+								break;
+							default:
+								debug_printf("程序好像出问题了\r\n");
+								break;
+						}
+						if(cmd_check == 2 && Data_Up)
+						{
+							if(Data_Up == 1)
+							{
+								memset(send_buf,0xFF,13);
+								
+								debug_printf("上报一次\r\n");
+								send_buf[0] = 0xAA;
+								send_buf[12] = 0x0F;
+								send_buf[1] = local_time[3];
+								send_buf[2] = local_time[4];
+								send_buf[3] = local_time[5];
+								
+								if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x01)
+								{
+									
+								}
+							}
+						}
+					}
+				}
 				if(HAL_GetTick() >= tickcount + 1000)
 				{
 					tickcount = HAL_GetTick();
