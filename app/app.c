@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include "stdlib.h"
 #include "common.h"
@@ -9,7 +10,8 @@
 #include "sensors_test.h"
 #include "opt3001.h"
 #include "mpl3115.h"
-
+#include "ST7789v.h"
+#include "XPT2046.h"
 
 extern DEVICE_MODE_T device_mode;
 extern DEVICE_MODE_T *Device_Mode_str;
@@ -17,7 +19,7 @@ down_list_t *pphead = NULL;
 uint8_t devEUI[]="AT+DEVEUI=009569000000F627,D391010220102816,1\r\n";
 uint8_t appEUI[]="AT+APPEUI=88650AA038E73FFB\r\n";
 uint8_t appKEY[]="AT+APPKEY=7054061A8CA122107F6F8FF3FCE2DDC2,0\r\n";
-uint8_t appclassc[]="AT+CLASS=2\r\nAT+CONFIRM=1\r\nAT+SAVE\r\n";
+uint8_t appclassc[]="AT+CLASS=2\r\nAT+CONFIRM=0\r\nAT+SAVE\r\n";
 uint8_t timesync[]="AT+TIMESYNC\r\n";
 
 //0:未收到; 1:仅收到帧头; 2:收到合法控制指令; 3:收到帧头帧尾但是长度不对; 
@@ -31,10 +33,9 @@ uint8_t send_buf[13];
 
 uint8_t time[30];
 uint8_t local_time[6];
+char slocal_time[8];
 uint32_t gettimetick;
 uint32_t tickcount;
-
-char  buffer [33];
 
 float get_temp;   //温度
 float get_lux;    //光照
@@ -42,6 +43,8 @@ float get_humi;   //湿度
 float get_Press;  //气压
 
 void SetLocalTime(uint8_t time[30]);
+void UpData(void);
+
 
 //-----------------Users application--------------------------
 void LoRaWAN_Func_Process(void)
@@ -168,15 +171,15 @@ void LoRaWAN_Func_Process(void)
             }
 
             //get time 
-            nodeGpioConfig(wake, wakeup);
-            nodeGpioConfig(mode, command);
+					  nodeGpioConfig(wake, wakeup);
+            nodeGpioConfig(mode, command);        
             lpusart1_send_data(timesync,sizeof(timesync));
 						i = 1;
 						HAL_Delay(10);
             while(true)   //开机后同步时间，如果没有获取到就重新同步
             {
 							
-							  HAL_Delay(300);
+							  HAL_Delay(1000);
                 if(UART_TO_LRM_RECEIVE_FLAG)
                 {
                     UART_TO_LRM_RECEIVE_FLAG = 0;
@@ -190,18 +193,29 @@ void LoRaWAN_Func_Process(void)
                         break;
                     }
                 }
-								i++;
-								if(i > 3)
+								
+								if(i <= 3)
 								{
-									lpusart1_send_data(timesync,sizeof(timesync));
+									i++;
+								  lpusart1_send_data(timesync,sizeof(timesync));
+								}
+								else
+								{
+									debug_printf("Time Sync Error!\r\n");
 									i = 0;
+									return;
 								}
             }
 						
-        }
-        else
-        {
-           
+						/*这里LCD显示设备EUI,第一次时间，屏幕尺寸240*320*/
+						LCD_Clear(WHITE);
+						sprintf(slocal_time,"%d:%d:%d",local_time[3],local_time[4],local_time[5]);
+						LCD_ShowString(8,8,"DevEUI:009569000000F627",BLUE);
+						LCD_ShowString(8,24,"First Sync Time:",BLUE);
+						LCD_ShowString(8,40,slocal_time,BLUE);
+						LCD_ShowString(8,56,"Data Demodulation",BLUE);
+						LCD_ShowString(30,72,"Report Mode:",BLUE);
+						LCD_ShowString(30,104,"Upload Data:",BLUE);
         }
 				
 				/*获取传感器温度、亮度、湿度、气压*/
@@ -213,7 +227,6 @@ void LoRaWAN_Func_Process(void)
 				if(UART_TO_LRM_RECEIVE_FLAG)
 				{
 					UART_TO_LRM_RECEIVE_FLAG = 0;
-					usart2_send_data(UART_TO_LRM_RECEIVE_BUFFER,UART_TO_LRM_RECEIVE_LENGTH);
 					cmd_check = 4;
 					
 					if(UART_TO_LRM_RECEIVE_BUFFER[0] == 0xBB)
@@ -230,45 +243,42 @@ void LoRaWAN_Func_Process(void)
 						switch(cmd_check)
 						{
 							case 1:
-								debug_printf("帧尾错误\r\n");
+								debug_printf("No end.\r\n");
 								break;
 							case 2:
 								if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x00)
+								{
 									Data_Up = 1;
+									LCD_ShowString(30,88,"Once",BLUE);
+								}
 								if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x01)
+								{
 									Data_Up = 2;
+									LCD_ShowString(30,88,"Every Minute",BLUE);
+								}
 								break;
 							case 3:
-								debug_printf("指令长度错误\r\n");
+								debug_printf("Length Err\r\n");
 								break;
 							case 4:
-								debug_printf("帧头错误\r\n");
+								debug_printf("Not cmd.\r\n");
 								break;
 							default:
 								debug_printf("程序好像出问题了\r\n");
 								break;
 						}
-						if(cmd_check == 2 && Data_Up)
+						
+						if(cmd_check == 2 && Data_Up == 1)
 						{
-							if(Data_Up == 1)
-							{
-								memset(send_buf,0xFF,13);
-								
-								debug_printf("上报一次\r\n");
-								send_buf[0] = 0xAA;
-								send_buf[12] = 0x0F;
-								send_buf[1] = local_time[3];
-								send_buf[2] = local_time[4];
-								send_buf[3] = local_time[5];
-								
-								if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x01)
-								{
-									
-								}
-							}
+              debug_printf("Update Once\r\n");
+							UpData();
+							cmd_check = 0;
+							Data_Up = 0;
+							debug_printf("Update Complete\r\n");
 						}
 					}
 				}
+				
 				if(HAL_GetTick() >= tickcount + 1000)
 				{
 					tickcount = HAL_GetTick();
@@ -301,6 +311,11 @@ void LoRaWAN_Func_Process(void)
 								i = 0;
 							}
             }
+						if(Data_Up == 2) //整分钟上传
+						{
+							debug_printf("Minutes Update.\r\n");
+							UpData();
+						}
 					}
 				}
     }
@@ -352,4 +367,51 @@ void SetLocalTime(uint8_t time[30])
 		debug_printf("%02d:",local_time[j]);
 	}
 	debug_printf("%02d\r\n",local_time[5]);
+}
+
+void UpData()
+{
+	memset(send_buf,0xFF,13);
+	
+	send_buf[0] = 0xAA;
+	send_buf[12] = 0x0F;
+	send_buf[1] = local_time[3];
+	send_buf[2] = local_time[4];
+	send_buf[3] = local_time[5];
+	
+	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x01)
+	{
+		LCD_ShowString(30,120,"LUX:Y",BLUE);
+		send_buf[4] = get_lux / 255;
+		send_buf[5] = (uint8_t)get_lux - send_buf[4] * 255;
+	}
+	else
+		LCD_ShowString(30,120,"LUX:N",BLUE);
+	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x02)
+	{
+		LCD_ShowString(30,136,"PRESSURE:Y",BLUE);
+		send_buf[6] = get_Press / 255;
+		send_buf[7] = (uint8_t)get_Press - send_buf[6] * 255;
+	}
+	else
+		LCD_ShowString(30,136,"PRESSURE:N",BLUE);
+	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x04)
+	{
+		LCD_ShowString(30,152,"TEMPERATURE:Y",BLUE);
+		send_buf[8] = get_temp / 255;
+		send_buf[9] = (uint8_t)get_temp - send_buf[8] * 255;
+	}
+	else
+		LCD_ShowString(30,152,"TEMPERATURE:N",BLUE);
+	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x08)
+	{
+		LCD_ShowString(30,168,"HUMIDITY:Y",BLUE);
+		send_buf[10] = get_humi / 255;
+		send_buf[11] = (uint8_t)get_humi - send_buf[10] * 255;
+	}
+	else
+		LCD_ShowString(30,168,"HUMIDITY:N",BLUE);
+	nodeDataCommunicate((uint8_t *)send_buf,13,&pphead);
+	debug_printf("Sending...\r\n");
+
 }
