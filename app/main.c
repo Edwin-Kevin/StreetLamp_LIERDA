@@ -43,7 +43,7 @@
 #include "ST7789v.h"
 #include "XPT2046.h"
 /* USER CODE BEGIN 0 */
-
+int Status= 0;
 /* USER CODE END 0 */
 
 /**
@@ -98,7 +98,12 @@ int main(void)
     /* USER CODE BEGIN WHILE  */
     while (1)
     {
-        LoRaWAN_Func_Process();
+      Status = LoRaWAN_Func_Process();
+			if(Status == 1)
+			{
+				debug_printf("System Halted!\r\n");
+				break;
+			}
     }
 }
 

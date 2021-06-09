@@ -34,7 +34,7 @@ typedef struct {
 
 } DEBUG;
 
-void LoRaWAN_Func_Process(void);
+int LoRaWAN_Func_Process(void);
 void LoRaWAN_Borad_Info_Print(void);
 
 
