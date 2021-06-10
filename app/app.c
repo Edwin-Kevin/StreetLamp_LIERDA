@@ -16,11 +16,11 @@
 extern DEVICE_MODE_T device_mode;
 extern DEVICE_MODE_T *Device_Mode_str;
 down_list_t *pphead = NULL;
-uint8_t devEUI[]="AT+DEVEUI=009569000000F627,D391010220102816,1\r\n";
-uint8_t appEUI[]="AT+APPEUI=88650AA038E73FFB\r\n";
-uint8_t appKEY[]="AT+APPKEY=7054061A8CA122107F6F8FF3FCE2DDC2,0\r\n";
-uint8_t appclassc[]="AT+CLASS=2\r\nAT+CONFIRM=1\r\nAT+SAVE\r\n";
-uint8_t timesync[]="AT+TIMESYNC\r\n";
+char devEUI[]="AT+DEVEUI=009569000000F627,D391010220102816,1";
+char appEUI[]="AT+APPEUI=88650AA038E73FFB";
+char appKEY[]="AT+APPKEY=7054061A8CA122107F6F8FF3FCE2DDC2,0";
+char appclassc[]="AT+CLASS=2\r\nAT+CONFIRM=1\r\nAT+SAVE";
+char timesync[]="AT+TIMESYNC";
 
 //0:未收到; 1:仅收到帧头; 2:收到合法控制指令; 3:收到帧头帧尾但是长度不对; 
 //4:收到的不是控制指令;
@@ -99,8 +99,8 @@ int LoRaWAN_Func_Process(void)
         }
 				if(i > 0 && i < 3 && HAL_GetTick() > gettimetick+ 5000)
 				{
-					lpusart1_send_data(timesync,sizeof(timesync));
-//					nodeCmdConfig(timesync);
+//					lpusart1_send_data(timesync,sizeof(timesync));
+					nodeCmdConfig(timesync);
 					gettimetick = HAL_GetTick();
 					i++;
 				}
@@ -161,15 +161,15 @@ int LoRaWAN_Func_Process(void)
             debug_printf("\r\n[Project Mode]\r\n");
 //					  Node_Hard_Reset();
 
-            lpusart1_send_data(devEUI,sizeof(devEUI));
-            lpusart1_send_data(appEUI,sizeof(appEUI));
-            lpusart1_send_data(appKEY,sizeof(appKEY));
-			
-            lpusart1_send_data(appclassc,sizeof(appclassc));
-//					  nodeCmdConfig(devEUI);
-//					  nodeCmdConfig(appEUI);
-//					  nodeCmdConfig(appKEY);
-//					  nodeCmdConfig(appclassc);
+//            lpusart1_send_data(devEUI,sizeof(devEUI));
+//            lpusart1_send_data(appEUI,sizeof(appEUI));
+//            lpusart1_send_data(appKEY,sizeof(appKEY));
+//			
+//            lpusart1_send_data(appclassc,sizeof(appclassc));
+					  nodeCmdConfig(devEUI);
+					  nodeCmdConfig(appEUI);
+					  nodeCmdConfig(appKEY);
+					  nodeCmdConfig(appclassc);
 					  
             if(nodeJoinNet(JOIN_TIME_120_SEC) == false)
                 return 1;
@@ -177,8 +177,8 @@ int LoRaWAN_Func_Process(void)
             //get time 
 					  nodeGpioConfig(wake, wakeup);
             nodeGpioConfig(mode, command);        
-            lpusart1_send_data(timesync,sizeof(timesync));
-//						nodeCmdConfig(timesync);
+//            lpusart1_send_data(timesync,sizeof(timesync));
+						nodeCmdConfig(timesync);
 						i = 1;
 						HAL_Delay(10);
             while(true)   //开机后同步时间，如果没有获取到就重新同步
@@ -203,8 +203,8 @@ int LoRaWAN_Func_Process(void)
 								if(i <= 3)
 								{
 									i++;
-								  lpusart1_send_data(timesync,sizeof(timesync));
-//									nodeCmdConfig(timesync);
+//								  lpusart1_send_data(timesync,sizeof(timesync));
+									nodeCmdConfig(timesync);
 								}
 								else
 								{
@@ -292,8 +292,8 @@ int LoRaWAN_Func_Process(void)
 					if(local_time[5] >= 60)  //每分钟同步一次时间
 					{
 						debug_printf("Auto Time SYNC\r\n");
-						lpusart1_send_data(timesync,sizeof(timesync));
-//						nodeCmdConfig(timesync);
+//						lpusart1_send_data(timesync,sizeof(timesync));
+						nodeCmdConfig(timesync);
 						i = 1;
             while(true)
             {
@@ -315,8 +315,8 @@ int LoRaWAN_Func_Process(void)
 							if(i >= 10)
 							{
 								i = 0;
-								lpusart1_send_data(timesync,sizeof(timesync));
-//								nodeCmdConfig(timesync);
+//								lpusart1_send_data(timesync,sizeof(timesync));
+								nodeCmdConfig(timesync);
 								debug_printf("Time Sync Again!\r\n");
 							}
 							else
@@ -390,9 +390,9 @@ void UpData()
 	
 	send_buf[0] = 0xAA;
 	send_buf[12] = 0x0F;
-	send_buf[1] = local_time[3];
-	send_buf[2] = local_time[4];
-	send_buf[3] = local_time[5];
+	send_buf[1] = local_time[3] / 10 * 16 + local_time[3] % 10;
+	send_buf[2] = local_time[4] / 10 * 16 + local_time[4] % 10;
+	send_buf[3] = local_time[5] / 10 * 16 + local_time[5] % 10;
 	
 	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x01)
 	{
