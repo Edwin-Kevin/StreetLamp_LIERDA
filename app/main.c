@@ -93,6 +93,8 @@ int main(void)
 
     /** 开发板信息打印 */
     LoRaWAN_Borad_Info_Print();
+		
+		LCD_Clear(WHITE);
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE  */

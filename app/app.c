@@ -13,6 +13,8 @@
 #include "ST7789v.h"
 #include "XPT2046.h"
 
+#define MAX_DATA_LEN 80
+
 extern DEVICE_MODE_T device_mode;
 extern DEVICE_MODE_T *Device_Mode_str;
 down_list_t *pphead = NULL;
@@ -41,6 +43,10 @@ float get_temp;   //温度
 float get_lux;    //光照
 float get_humi;   //湿度
 float get_Press;  //气压
+
+uint32_t data_tickcount = 0;
+uint8_t data_i = 0;
+uint16_t data_lux[MAX_DATA_LEN] = {0};
 
 void SetLocalTime(uint8_t time[30]);
 void UpData(void);
@@ -84,7 +90,7 @@ int LoRaWAN_Func_Process(void)
         if(UART_TO_LRM_RECEIVE_FLAG)
         {
             UART_TO_LRM_RECEIVE_FLAG = 0;
-					  if(strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") != NULL)
+            if(strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") != NULL)
 						{
 //							memset(time,0,30);
 							memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO: ") + 11,17);
@@ -171,14 +177,23 @@ int LoRaWAN_Func_Process(void)
 					  nodeCmdConfig(appKEY);
 					  nodeCmdConfig(appclassc);
 					  
+					  LCD_Clear(WHITE);
+					  LCD_ShowString(30,120,"Connecting To Server...",BLUE);
+					  
             if(nodeJoinNet(JOIN_TIME_120_SEC) == false)
-                return 1;
+						{
+							LCD_Clear(WHITE);
+							LCD_ShowString(30,120,"Join FAILED!",BLUE);
+              return 1;
+						}
 
             //get time 
 					  nodeGpioConfig(wake, wakeup);
             nodeGpioConfig(mode, command);        
 //            lpusart1_send_data(timesync,sizeof(timesync));
 						nodeCmdConfig(timesync);
+						LCD_Clear(WHITE);
+					  LCD_ShowString(30,120,"TIME SYNC...",BLUE);
 						i = 1;
 						HAL_Delay(10);
             while(true)   //开机后同步时间，如果没有获取到就重新同步
@@ -196,6 +211,7 @@ int LoRaWAN_Func_Process(void)
                         debug_printf("GetRightTime\r\n");
 											  SetLocalTime(time);
 											  tickcount = HAL_GetTick();
+											  data_tickcount = HAL_GetTick();
                         break;
                     }
                 }
@@ -225,11 +241,37 @@ int LoRaWAN_Func_Process(void)
 						LCD_ShowString(30,104,"Upload Data:",BLUE);
         }
 				
-				/*获取传感器温度、亮度、湿度、气压*/
-				get_temp = HDC1000_Read_Temper() / 1000.0;
-				get_lux = OPT3001_Get_Lux();
-				get_humi = HDC1000_Read_Humidi() / 1000.0;
-				get_Press = MPL3115_ReadPressure() / 100000.0;
+
+				if(HAL_GetTick() >= data_tickcount + 500)
+				{
+					/*获取传感器温度、亮度、湿度、气压*/
+					get_temp = HDC1000_Read_Temper() / 1000.0;
+					get_lux = OPT3001_Get_Lux();
+					get_humi = HDC1000_Read_Humidi() / 1000.0;
+					get_Press = MPL3115_ReadPressure() / 100000.0;
+					
+					data_tickcount = HAL_GetTick();
+					data_lux[data_i] = 320 - get_lux / 50;
+					data_lux[data_i] = (data_lux[data_i] >= 200) ? data_lux[data_i] : 200;
+					data_lux[data_i] = (data_lux[data_i] <= 320) ? data_lux[data_i] : 320;
+//					debug_printf("%d",get_lux);
+					if(data_i < MAX_DATA_LEN - 1)
+						data_i++;
+					else
+					{
+						memcpy(data_lux,data_lux + 1,2 * (MAX_DATA_LEN - 1));
+						data_i = MAX_DATA_LEN - 1;
+					}
+					
+					LCD_Fill(0,200,240,320,WHITE);
+//					LCD_DrawLine(0,250,3,320,RED);
+//					LCD_DrawLine(3,320,6,180,RED);
+//					LCD_DrawLine(6,180,9,320,RED);
+					for(int j = 1;j < data_i;j++)
+					{
+						LCD_DrawLine(3*(j - 1),(uint16_t)data_lux[j - 1],3*j,(uint16_t)data_lux[j],RED);
+					}
+				}
 				
 				if(UART_TO_LRM_RECEIVE_FLAG)
 				{
@@ -285,7 +327,7 @@ int LoRaWAN_Func_Process(void)
 					}
 				}
 				
-				if(HAL_GetTick() >= tickcount + 1000)   //卡死点在284-322
+				if(HAL_GetTick() >= tickcount + 1000)
 				{
 					tickcount = HAL_GetTick();
 					local_time[5]++;
@@ -335,7 +377,9 @@ int LoRaWAN_Func_Process(void)
     break;
 
     default:
-        return 0;
+			LCD_ShowString(30,120,"Press KEY2 TO",BLUE);
+		  LCD_ShowString(30,150,"ENTER PROJECT MODE",BLUE);
+      return 0;
     }
 		return 0;
 }
