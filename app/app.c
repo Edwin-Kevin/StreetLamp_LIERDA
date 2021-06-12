@@ -50,6 +50,7 @@ uint16_t data_lux[MAX_DATA_LEN] = {0};
 
 void SetLocalTime(uint8_t time[30]);
 void UpData(void);
+void LCD_ShowInfo(void);
 
 
 //-----------------Users application--------------------------
@@ -239,6 +240,10 @@ int LoRaWAN_Func_Process(void)
 						LCD_ShowString(8,56,"Data Demodulation",BLUE);
 						LCD_ShowString(30,72,"Report Mode:",BLUE);
 						LCD_ShowString(30,104,"Upload Data:",BLUE);
+						LCD_ShowString(30,120,"LUX:",BLUE);
+						LCD_ShowString(30,136,"PRESSURE:",BLUE);
+						LCD_ShowString(30,152,"TEMPERATURE:",BLUE);
+						LCD_ShowString(30,168,"HUMIDITY:",BLUE);
         }
 				
 
@@ -295,15 +300,9 @@ int LoRaWAN_Func_Process(void)
 								break;
 							case 2:
 								if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x00)
-								{
 									Data_Up = 1;
-									LCD_ShowString(30,88,"Once",BLUE);
-								}
 								if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x01)
-								{
 									Data_Up = 2;
-									LCD_ShowString(30,88,"Every Minute",BLUE);
-								}
 								break;
 							case 3:
 								debug_printf("Length Err\r\n");
@@ -315,6 +314,7 @@ int LoRaWAN_Func_Process(void)
 								debug_printf("程序好像出问题了\r\n");
 								break;
 						}
+						LCD_ShowInfo();
 						
 						if(cmd_check == 2 && Data_Up == 1)
 						{
@@ -322,7 +322,6 @@ int LoRaWAN_Func_Process(void)
 							UpData();
 							cmd_check = 0;
 							Data_Up = 0;
-							debug_printf("Update Complete\r\n");
 						}
 					}
 				}
@@ -429,7 +428,7 @@ void SetLocalTime(uint8_t time[30])
 }
 
 void UpData()
-{
+{	
 	memset(send_buf,0xFF,13);
 	
 	send_buf[0] = 0xAA;
@@ -440,37 +439,66 @@ void UpData()
 	
 	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x01)
 	{
-		LCD_ShowString(30,120,"LUX:Y",BLUE);
 		send_buf[4] = get_lux / 255;
 		send_buf[5] = (uint8_t)get_lux - send_buf[4] * 255;
 	}
-	else
-		LCD_ShowString(30,120,"LUX:N",BLUE);
 	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x02)
 	{
-		LCD_ShowString(30,136,"PRESSURE:Y",BLUE);
 		send_buf[6] = get_Press / 255;
 		send_buf[7] = (uint8_t)get_Press - send_buf[6] * 255;
 	}
-	else
-		LCD_ShowString(30,136,"PRESSURE:N",BLUE);
 	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x04)
 	{
-		LCD_ShowString(30,152,"TEMPERATURE:Y",BLUE);
 		send_buf[8] = get_temp / 255;
 		send_buf[9] = (uint8_t)get_temp - send_buf[8] * 255;
 	}
-	else
-		LCD_ShowString(30,152,"TEMPERATURE:N",BLUE);
 	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x08)
 	{
-		LCD_ShowString(30,168,"HUMIDITY:Y",BLUE);
 		send_buf[10] = get_humi / 255;
 		send_buf[11] = (uint8_t)get_humi - send_buf[10] * 255;
 	}
-	else
-		LCD_ShowString(30,168,"HUMIDITY:N",BLUE);
-	nodeDataCommunicate((uint8_t *)send_buf,13,&pphead);
 	debug_printf("Sending...\r\n");
+	nodeDataCommunicate((uint8_t *)send_buf,13,&pphead);
+	debug_printf("Update Complete\r\n");
+
+}
+
+void LCD_ShowInfo(void)
+{
+	LCD_Fill(30,88,240,104,WHITE);
+	if(Data_Up == 1)
+		LCD_ShowString(30,88,"Once",BLUE);
+	if(Data_Up == 2)
+		LCD_ShowString(30,88,"Every Minute",BLUE);
+	
+	LCD_Fill(140,120,156,136,WHITE);
+	LCD_Fill(140,136,156,152,WHITE);
+	LCD_Fill(140,152,156,168,WHITE);
+	LCD_Fill(140,168,156,184,WHITE);
+
+  if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x01)
+	{
+		LCD_ShowString(140,120,"Y",BLUE);
+	}
+	else
+		LCD_ShowString(140,120,"N",BLUE);
+	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x02)
+	{
+		LCD_ShowString(140,136,"Y",BLUE);
+	}
+	else
+		LCD_ShowString(140,136,"N",BLUE);
+	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x04)
+	{
+		LCD_ShowString(140,152,"Y",BLUE);
+	}
+	else
+		LCD_ShowString(140,152,"N",BLUE);
+	if(UART_TO_LRM_RECEIVE_BUFFER[2] & 0x08)
+	{
+		LCD_ShowString(140,168,"Y",BLUE);
+	}
+	else
+		LCD_ShowString(140,168,"N",BLUE);
 
 }
