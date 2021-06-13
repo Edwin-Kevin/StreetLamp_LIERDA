@@ -79,11 +79,11 @@ int LoRaWAN_Func_Process(void)
         if(UART_TO_PC_RECEIVE_FLAG)
         {
             UART_TO_PC_RECEIVE_FLAG = 0;
-					  if(strstr((char *)UART_TO_PC_RECEIVE_BUFFER,"AT+TIMESYNC") != NULL)
-						{
-							i = 1;
-							gettimetick = HAL_GetTick();
-						}
+            if(strstr((char *)UART_TO_PC_RECEIVE_BUFFER,"AT+TIMESYNC") != NULL)
+            {
+                i = 1;
+                gettimetick = HAL_GetTick();
+            }
             lpusart1_send_data(UART_TO_PC_RECEIVE_BUFFER,UART_TO_PC_RECEIVE_LENGTH);
 //						HAL_Delay(1000);
         }
@@ -92,25 +92,23 @@ int LoRaWAN_Func_Process(void)
         {
             UART_TO_LRM_RECEIVE_FLAG = 0;
             if(strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") != NULL)
-						{
-//							memset(time,0,30);
-							memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO: ") + 11,17);
-							debug_printf("GetRightTime:\r\n");
-//							debug_printf("%s\r\n",time);
-							gettimetick = 0;
-							i = 0;
-							tickcount = HAL_GetTick();
-							SetLocalTime(time);
-						}
+            {
+//              memset(time,0,30);
+                memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO: ") + 11,17);
+                debug_printf("GetRightTime:\r\n");
+                gettimetick = 0;
+                i = 0;
+                tickcount = HAL_GetTick();
+                SetLocalTime(time);
+            }
 //            usart2_send_data(UART_TO_LRM_RECEIVE_BUFFER,UART_TO_LRM_RECEIVE_LENGTH);
         }
-				if(i > 0 && i < 3 && HAL_GetTick() > gettimetick+ 5000)
-				{
-//					lpusart1_send_data(timesync,sizeof(timesync));
-					nodeCmdConfig(timesync);
-					gettimetick = HAL_GetTick();
-					i++;
-				}
+            if(i > 0 && i < 3 && HAL_GetTick() > gettimetick+ 5000)
+            {
+                nodeCmdConfig(timesync);
+                gettimetick = HAL_GetTick();
+                i++;
+            }
     }
     break;
 
@@ -168,219 +166,212 @@ int LoRaWAN_Func_Process(void)
             debug_printf("\r\n[Project Mode]\r\n");
 //					  Node_Hard_Reset();
 
-//            lpusart1_send_data(devEUI,sizeof(devEUI));
-//            lpusart1_send_data(appEUI,sizeof(appEUI));
-//            lpusart1_send_data(appKEY,sizeof(appKEY));
-//			
-//            lpusart1_send_data(appclassc,sizeof(appclassc));
-					  nodeCmdConfig(devEUI);
-					  nodeCmdConfig(appEUI);
-					  nodeCmdConfig(appKEY);
-					  nodeCmdConfig(appclassc);
+            nodeCmdConfig(devEUI);
+            nodeCmdConfig(appEUI);
+            nodeCmdConfig(appKEY);
+            nodeCmdConfig(appclassc);
 					  
-					  LCD_Clear(WHITE);
-					  LCD_ShowString(30,120,"Connecting To Server...",BLUE);
+            LCD_Clear(WHITE);
+            LCD_ShowString(30,120,"Connecting To Server...",BLUE);
 					  
             if(nodeJoinNet(JOIN_TIME_120_SEC) == false)
-						{
-							LCD_Clear(WHITE);
-							LCD_ShowString(30,120,"Join FAILED!",BLUE);
+            {
+                LCD_Clear(WHITE);
+                LCD_ShowString(30,120,"Join FAILED!",BLUE);
               return 1;
-						}
+            }
 
             //get time 
-					  nodeGpioConfig(wake, wakeup);
+            nodeGpioConfig(wake, wakeup);
             nodeGpioConfig(mode, command);        
-//            lpusart1_send_data(timesync,sizeof(timesync));
-						nodeCmdConfig(timesync);
-						LCD_Clear(WHITE);
-					  LCD_ShowString(30,120,"TIME SYNC...",BLUE);
-						i = 1;
-						HAL_Delay(10);
+            nodeCmdConfig(timesync);
+            LCD_Clear(WHITE);
+            LCD_ShowString(30,120,"TIME SYNC...",BLUE);
+            i = 1;
+            HAL_Delay(10);
             while(true)   //开机后同步时间，如果没有获取到就重新同步
             {
 							
-							  HAL_Delay(5000);
+                HAL_Delay(5000);
                 if(UART_TO_LRM_RECEIVE_FLAG)
                 {
                     UART_TO_LRM_RECEIVE_FLAG = 0;
                     if(strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO: ") != NULL)
                     {
-											  i = 0;
-											  memset(time,0,30);
-											  memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") + 11,17);
+                        i = 0;
+                        memset(time,0,30);
+                        memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") + 11,17);
                         debug_printf("GetRightTime\r\n");
-											  SetLocalTime(time);
-											  tickcount = HAL_GetTick();
-											  data_tickcount = HAL_GetTick();
+                        SetLocalTime(time);
+                        tickcount = HAL_GetTick();
+                        data_tickcount = HAL_GetTick();
                         break;
                     }
                 }
 								
-								if(i <= 3)
-								{
-									i++;
-//								  lpusart1_send_data(timesync,sizeof(timesync));
-									nodeCmdConfig(timesync);
-								}
-								else
-								{
-									debug_printf("Time Sync Error!\r\n");
-									i = 0;
-									return 1;
-								}
+                if(i <= 3)
+                {
+                    i++;
+                    nodeCmdConfig(timesync);
+                }
+                else
+                {
+                    debug_printf("Time Sync Error!\r\n");
+                    i = 0;
+                    return 1;
+                }
             }
 						
 						/*这里LCD显示设备EUI,第一次时间，屏幕尺寸240*320*/
-						LCD_Clear(WHITE);
-						sprintf(slocal_time,"%02d:%02d:%02d",local_time[3],local_time[4],local_time[5]);
-						LCD_ShowString(8,8,"DevEUI:009569000000F627",BLUE);
-						LCD_ShowString(8,24,"First Sync Time:",BLUE);
-						LCD_ShowString(8,40,slocal_time,BLUE);
-						LCD_ShowString(8,56,"Data Demodulation",BLUE);
-						LCD_ShowString(30,72,"Report Mode:",BLUE);
-						LCD_ShowString(30,104,"Upload Data:",BLUE);
-						LCD_ShowString(30,120,"LUX:",BLUE);
-						LCD_ShowString(30,136,"PRESSURE:",BLUE);
-						LCD_ShowString(30,152,"TEMPERATURE:",BLUE);
-						LCD_ShowString(30,168,"HUMIDITY:",BLUE);
+            LCD_Clear(WHITE);
+            sprintf(slocal_time,"%02d:%02d:%02d",local_time[3],local_time[4],local_time[5]);
+            LCD_ShowString(8,8,"DevEUI:009569000000F627",BLUE);
+            LCD_ShowString(8,24,"First Sync Time:",BLUE);
+            LCD_ShowString(8,40,slocal_time,BLUE);
+            LCD_ShowString(8,56,"Data Demodulation",BLUE);
+            LCD_ShowString(30,72,"Report Mode:",BLUE);
+            LCD_ShowString(30,104,"Upload Data:",BLUE);
+            LCD_ShowString(30,120,"LUX:",BLUE);
+            LCD_ShowString(30,136,"PRESSURE:",BLUE);
+            LCD_ShowString(30,152,"TEMPERATURE:",BLUE);
+            LCD_ShowString(30,168,"HUMIDITY:",BLUE);
         }
 				
 
-				if(HAL_GetTick() >= data_tickcount + 500)
-				{
-					/*获取传感器温度、亮度、湿度、气压*/
-					get_temp = HDC1000_Read_Temper() / 1000.0;
-					get_lux = OPT3001_Get_Lux();
-					get_humi = HDC1000_Read_Humidi() / 1000.0;
-					get_Press = MPL3115_ReadPressure() / 100000.0;
-					
-					data_tickcount = HAL_GetTick();
-					data_lux[data_i] = 320 - get_lux / 50;
-					data_lux[data_i] = (data_lux[data_i] >= 200) ? data_lux[data_i] : 200;
-					data_lux[data_i] = (data_lux[data_i] <= 320) ? data_lux[data_i] : 320;
-//					debug_printf("%d",get_lux);
-					if(data_i < MAX_DATA_LEN - 1)
-						data_i++;
-					else
-					{
-						memcpy(data_lux,data_lux + 1,2 * (MAX_DATA_LEN - 1));
-						data_i = MAX_DATA_LEN - 1;
-					}
-					
-					LCD_Fill(0,200,240,320,WHITE);
-//					LCD_DrawLine(0,250,3,320,RED);
-//					LCD_DrawLine(3,320,6,180,RED);
-//					LCD_DrawLine(6,180,9,320,RED);
-					for(int j = 1;j < data_i;j++)
-					{
-						LCD_DrawLine(3*(j - 1),(uint16_t)data_lux[j - 1],3*j,(uint16_t)data_lux[j],RED);
-					}
-				}
-				
-				if(UART_TO_LRM_RECEIVE_FLAG)
-				{
-					UART_TO_LRM_RECEIVE_FLAG = 0;
-					cmd_check = 4;
-					
-					if(UART_TO_LRM_RECEIVE_BUFFER[0] == 0xBB)
-					{
-						cmd_check = 1;
-						
-						if(UART_TO_LRM_RECEIVE_BUFFER[3] == 0x0F)
-						{
-							cmd_check = 2;
-							if(UART_TO_LRM_RECEIVE_LENGTH != 4)
-								cmd_check = 3;
-						}
-						switch(cmd_check)
-						{
-							case 1:
-								debug_printf("No end.\r\n");
-								break;
-							case 2:
-								if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x00)
-									Data_Up = 1;
-								if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x01)
-									Data_Up = 2;
-								break;
-							case 3:
-								debug_printf("Length Err\r\n");
-								break;
-							case 4:
-								debug_printf("Not cmd.\r\n");
-								break;
-							default:
-								debug_printf("程序好像出问题了\r\n");
-								break;
-						}
-						LCD_ShowInfo();
-						
-						if(cmd_check == 2 && Data_Up == 1)
-						{
-              debug_printf("Update Once\r\n");
-							UpData();
-							cmd_check = 0;
-							Data_Up = 0;
-						}
-					}
-				}
-				
-				if(HAL_GetTick() >= tickcount + 1000)
-				{
-					tickcount = HAL_GetTick();
-					local_time[5]++;
-					if(local_time[5] >= 60)  //每分钟同步一次时间
-					{
-						debug_printf("Auto Time SYNC\r\n");
-//						lpusart1_send_data(timesync,sizeof(timesync));
-						nodeCmdConfig(timesync);
-						i = 1;
-            while(true)
+        if(HAL_GetTick() >= data_tickcount + 500)
+        {
+            /*获取传感器温度、亮度、湿度、气压*/
+            get_temp = HDC1000_Read_Temper() / 1000.0;
+            get_lux = OPT3001_Get_Lux();
+            get_humi = HDC1000_Read_Humidi() / 1000.0;
+            get_Press = MPL3115_ReadPressure() / 100000.0;
+            
+            data_tickcount = HAL_GetTick();
+            data_lux[data_i] = 320 - get_lux / 50;
+            data_lux[data_i] = (data_lux[data_i] >= 200) ? data_lux[data_i] : 200;
+            data_lux[data_i] = (data_lux[data_i] <= 320) ? data_lux[data_i] : 320;
+//            debug_printf("%d",get_lux);
+            if(data_i < MAX_DATA_LEN - 1)
+            	data_i++;
+            else
             {
-							HAL_Delay(500);
-							if(UART_TO_LRM_RECEIVE_FLAG)
-							{
-									UART_TO_LRM_RECEIVE_FLAG = 0;
-									if(strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO: ") != NULL)
-									{
-										  i = 0;
-											memset(time,0,30);
-											memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") + 11,17);
-											debug_printf("GetRightTime\r\n");
-											SetLocalTime(time);
-											tickcount = HAL_GetTick();
-											break;
-									}
-							}
-							if(i >= 10)
-							{
-								i = 0;
-//								lpusart1_send_data(timesync,sizeof(timesync));
-								nodeCmdConfig(timesync);
-								debug_printf("Time Sync Again!\r\n");
-							}
-							else
-							{
-								i++;
-							}
+            	memcpy(data_lux,data_lux + 1,2 * (MAX_DATA_LEN - 1));
+            	data_i = MAX_DATA_LEN - 1;
             }
-						if(Data_Up == 2) //整分钟上传
-						{
-							debug_printf("Minutes Update.\r\n");
-							UpData();
-						}
-					}
-				}
+            
+            LCD_Fill(0,200,240,320,WHITE);
+//            LCD_DrawLine(0,250,3,320,RED);
+//            LCD_DrawLine(3,320,6,180,RED);
+//            LCD_DrawLine(6,180,9,320,RED);
+            for(int j = 1;j < data_i;j++)
+            {
+            	LCD_DrawLine(3*(j - 1),(uint16_t)data_lux[j - 1],3*j,(uint16_t)data_lux[j],RED);
+            }
+        }
+				
+        if(UART_TO_LRM_RECEIVE_FLAG)
+        {
+            UART_TO_LRM_RECEIVE_FLAG = 0;
+            cmd_check = 4;
+            
+            if(UART_TO_LRM_RECEIVE_BUFFER[0] == 0xBB)
+            {
+            	cmd_check = 1;
+            	
+            	if(UART_TO_LRM_RECEIVE_BUFFER[3] == 0x0F)
+            	{
+            		cmd_check = 2;
+            		if(UART_TO_LRM_RECEIVE_LENGTH != 4)
+            			cmd_check = 3;
+            	}
+            	switch(cmd_check)
+            	{
+            		case 1:
+            			debug_printf("No end.\r\n");
+            			break;
+            		case 2:
+            			if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x00)
+            				Data_Up = 1;
+            			if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x01)
+            				Data_Up = 2;
+            			break;
+            		case 3:
+            			debug_printf("Length Err\r\n");
+            			break;
+            		case 4:
+            			debug_printf("Not cmd.\r\n");
+            			break;
+            		default:
+            			debug_printf("程序好像出问题了\r\n");
+            			break;
+            	}
+            	LCD_ShowInfo();
+            	
+            	if(cmd_check == 2 && Data_Up == 1)
+            	{
+                    debug_printf("Update Once\r\n");
+            		UpData();
+            		cmd_check = 0;
+            		Data_Up = 0;
+            	}
+            }
+        }
+				
+        if(HAL_GetTick() >= tickcount + 1000)
+        {
+            tickcount = HAL_GetTick();
+            local_time[5]++;
+            if(local_time[5] >= 60)  //每分钟同步一次时间
+            {
+            	debug_printf("Auto Time SYNC\r\n");
+//            	lpusart1_send_data(timesync,sizeof(timesync));
+            	nodeCmdConfig(timesync);
+            	i = 1;
+                while(true)
+                {
+                    HAL_Delay(500);
+                    if(UART_TO_LRM_RECEIVE_FLAG)
+                    {
+                        UART_TO_LRM_RECEIVE_FLAG = 0;
+                        if(strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO: ") != NULL)
+                        {
+                            i = 0;
+                            memset(time,0,30);
+                            memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") + 11,17);
+                            debug_printf("GetRightTime\r\n");
+                            SetLocalTime(time);
+                            tickcount = HAL_GetTick();
+                            break;
+                        }
+                    }
+                    if(i >= 10)
+                    {
+                        i = 0;
+//                        lpusart1_send_data(timesync,sizeof(timesync));
+                        nodeCmdConfig(timesync);
+                        debug_printf("Time Sync Again!\r\n");
+                    }
+                    else
+            	    {
+                        i++;
+            	    }
+                }
+                if(Data_Up == 2) //整分钟上传
+                {
+                    debug_printf("Minutes Update.\r\n");
+                    UpData();
+                }
+            }
+        }
     }
     break;
 
     default:
-			LCD_ShowString(30,120,"Press KEY2 TO",BLUE);
-		  LCD_ShowString(30,150,"ENTER PROJECT MODE",BLUE);
-      return 0;
+        LCD_ShowString(30,120,"Press KEY2 TO",BLUE);
+        LCD_ShowString(30,150,"ENTER PROJECT MODE",BLUE);
+        return 0;
     }
-		return 0;
+    return 0;
 }
 
 
