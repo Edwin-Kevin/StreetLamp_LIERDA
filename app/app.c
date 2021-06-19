@@ -23,6 +23,7 @@ char appEUI[]="AT+APPEUI=88650AA038E73FFB";
 char appKEY[]="AT+APPKEY=7054061A8CA122107F6F8FF3FCE2DDC2,0";
 char appclassc[]="AT+CLASS=2\r\nAT+CONFIRM=1\r\nAT+SAVE";
 char timesync[]="AT+TIMESYNC";
+char ADR[]="AT+ADR=1";
 
 //0:未收到; 1:仅收到帧头; 2:收到合法控制指令; 3:收到帧头帧尾但是长度不对; 
 //4:收到的不是控制指令;
@@ -60,6 +61,7 @@ int LoRaWAN_Func_Process(void)
 
     uint16_t temper = 0;
 	  int i = 0;
+	  device_mode = PRO_TRAINING_MODE;
 
     switch((uint8_t)device_mode)
     {
@@ -158,7 +160,6 @@ int LoRaWAN_Func_Process(void)
     /*工程模式*/
     case PRO_TRAINING_MODE:
     {
-
         /* 如果不是Class C云平台数据采集模式, 则进入if语句,只执行一次 */
         if(dev_stat != PRO_TRAINING_MODE)
         {
@@ -170,6 +171,7 @@ int LoRaWAN_Func_Process(void)
             nodeCmdConfig(appEUI);
             nodeCmdConfig(appKEY);
             nodeCmdConfig(appclassc);
+//					  nodeCmdConfig(ADR);
 					  
             LCD_Clear(WHITE);
             LCD_ShowString(30,120,"Connecting To Server...",BLUE);
@@ -178,55 +180,50 @@ int LoRaWAN_Func_Process(void)
             {
                 LCD_Clear(WHITE);
                 LCD_ShowString(30,120,"Join FAILED!",BLUE);
-              return 1;
+                return 1;
             }
 
             //get time 
             nodeGpioConfig(wake, wakeup);
             nodeGpioConfig(mode, command);        
             nodeCmdConfig(timesync);
+            i = 1;
             LCD_Clear(WHITE);
             LCD_ShowString(30,120,"TIME SYNC...",BLUE);
-            i = 1;
-            HAL_Delay(10);
             while(true)   //开机后同步时间，如果没有获取到就重新同步
             {
-							
+                if(i > 3)
+                {
+                    debug_printf("Time SYNC ERROR!\r\n");
+									  LCD_Clear(WHITE);
+									  LCD_ShowString(30,120,"TIME SYNC ERROR!",BLUE);
+                    return 1;
+                }
                 HAL_Delay(5000);
                 if(UART_TO_LRM_RECEIVE_FLAG)
                 {
                     UART_TO_LRM_RECEIVE_FLAG = 0;
                     if(strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO: ") != NULL)
                     {
-                        i = 0;
-                        memset(time,0,30);
-                        memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") + 11,17);
-                        debug_printf("GetRightTime\r\n");
-                        SetLocalTime(time);
-                        tickcount = HAL_GetTick();
-                        data_tickcount = HAL_GetTick();
-                        break;
+                      i = 0;
+                      memset(time,0,30);
+                      memcpy(time,strstr((char *)UART_TO_LRM_RECEIVE_BUFFER,"+RTC INFO:") + 11,17);
+                      debug_printf("GetRightTime\r\n");
+                      SetLocalTime(time);
+                      tickcount = HAL_GetTick();
+                      data_tickcount = HAL_GetTick();
+                      break;
                     }
                 }
-								
-                if(i <= 3)
-                {
-                    i++;
-                    nodeCmdConfig(timesync);
-                }
-                else
-                {
-                    debug_printf("Time Sync Error!\r\n");
-                    i = 0;
-                    return 1;
-                }
+                i++;
             }
 						
-						/*这里LCD显示设备EUI,第一次时间，屏幕尺寸240*320*/
+            /*这里LCD显示设备EUI,第一次时间，屏幕尺寸240*320*/
             LCD_Clear(WHITE);
             sprintf(slocal_time,"%02d:%02d:%02d",local_time[3],local_time[4],local_time[5]);
             LCD_ShowString(8,8,"DevEUI:009569000000F627",BLUE);
             LCD_ShowString(8,24,"First Sync Time:",BLUE);
+//						LCD_Fill(8,40,80,56,YELLOW);
             LCD_ShowString(8,40,slocal_time,BLUE);
             LCD_ShowString(8,56,"Data Demodulation",BLUE);
             LCD_ShowString(30,72,"Report Mode:",BLUE);
@@ -235,6 +232,11 @@ int LoRaWAN_Func_Process(void)
             LCD_ShowString(30,136,"PRESSURE:",BLUE);
             LCD_ShowString(30,152,"TEMPERATURE:",BLUE);
             LCD_ShowString(30,168,"HUMIDITY:",BLUE);
+            LCD_ShowString(30,88,"None",BLUE);
+            LCD_ShowString(140,120,"N",BLUE);
+            LCD_ShowString(140,136,"N",BLUE);
+            LCD_ShowString(140,152,"N",BLUE);
+            LCD_ShowString(140,168,"N",BLUE);
         }
 				
 
@@ -250,19 +252,15 @@ int LoRaWAN_Func_Process(void)
             data_lux[data_i] = 320 - get_lux / 50;
             data_lux[data_i] = (data_lux[data_i] >= 200) ? data_lux[data_i] : 200;
             data_lux[data_i] = (data_lux[data_i] <= 320) ? data_lux[data_i] : 320;
-//            debug_printf("%d",get_lux);
             if(data_i < MAX_DATA_LEN - 1)
             	data_i++;
             else
             {
-            	memcpy(data_lux,data_lux + 1,2 * (MAX_DATA_LEN - 1));
-            	data_i = MAX_DATA_LEN - 1;
+                memcpy(data_lux,data_lux + 1,2 * (MAX_DATA_LEN - 1));
+                data_i = MAX_DATA_LEN - 1;
+                LCD_Fill(0,200,240,320,WHITE);
             }
             
-            LCD_Fill(0,200,240,320,WHITE);
-//            LCD_DrawLine(0,250,3,320,RED);
-//            LCD_DrawLine(3,320,6,180,RED);
-//            LCD_DrawLine(6,180,9,320,RED);
             for(int j = 1;j < data_i;j++)
             {
             	LCD_DrawLine(3*(j - 1),(uint16_t)data_lux[j - 1],3*j,(uint16_t)data_lux[j],RED);
@@ -284,49 +282,67 @@ int LoRaWAN_Func_Process(void)
             		if(UART_TO_LRM_RECEIVE_LENGTH != 4)
             			cmd_check = 3;
             	}
-            	switch(cmd_check)
-            	{
-            		case 1:
-            			debug_printf("No end.\r\n");
-            			break;
-            		case 2:
-            			if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x00)
-            				Data_Up = 1;
-            			if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x01)
-            				Data_Up = 2;
-            			break;
-            		case 3:
-            			debug_printf("Length Err\r\n");
-            			break;
-            		case 4:
-            			debug_printf("Not cmd.\r\n");
-            			break;
-            		default:
-            			debug_printf("程序好像出问题了\r\n");
-            			break;
-            	}
-            	LCD_ShowInfo();
-            	
-            	if(cmd_check == 2 && Data_Up == 1)
-            	{
-                    debug_printf("Update Once\r\n");
-            		UpData();
-            		cmd_check = 0;
-            		Data_Up = 0;
-            	}
+            }
+            switch(cmd_check)
+            {
+                case 1:
+                    debug_printf("No end.\r\n");
+                    break;
+                case 2:
+                    if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x00)
+                    	Data_Up = 1;
+                    if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x01)
+										{
+                    	Data_Up = 2;
+                    }  
+//										if(UART_TO_LRM_RECEIVE_BUFFER[1] == 0x04)
+//											usart2_send_data((uint8_t *)"88650AA038E73FFB",16);										
+                    break;
+                case 3:
+                    debug_printf("Length Err\r\n");
+                    break;
+                case 4:
+                    debug_printf("Not cmd.\r\n");
+                    break;
+                default:
+                    debug_printf("程序好像出问题了\r\n");
+                    break;
+            }
+            LCD_ShowInfo();
+            
+            if(cmd_check == 2 && Data_Up == 1)
+            {
+                debug_printf("Update Once\r\n");
+                UpData();
+                cmd_check = 0;
+                Data_Up = 0;
             }
         }
 				
         if(HAL_GetTick() >= tickcount + 1000)
         {
-            tickcount = HAL_GetTick();
+            tickcount += 1000;
             local_time[5]++;
-            if(local_time[5] >= 60)  //每分钟同步一次时间
+            if(local_time[5] >= 60)
             {
-            	debug_printf("Auto Time SYNC\r\n");
-//            	lpusart1_send_data(timesync,sizeof(timesync));
-            	nodeCmdConfig(timesync);
-            	i = 1;
+                local_time[5] = 0;
+                local_time[4]++;
+                if(local_time[4] >= 60)
+                {
+                    local_time[4] = 0;
+                    local_time[3]++;
+                }
+                if(Data_Up == 2) //整分钟上传
+                {
+                    debug_printf("Minutes Update.\r\n");
+                    UpData();
+                }
+            }
+            if(local_time[3] >= 24)  //每天零点同步一次时间
+            {
+                debug_printf("Auto Time SYNC\r\n");
+                nodeCmdConfig(timesync);
+                i = 1;
                 while(true)
                 {
                     HAL_Delay(500);
@@ -347,19 +363,11 @@ int LoRaWAN_Func_Process(void)
                     if(i >= 10)
                     {
                         i = 0;
-//                        lpusart1_send_data(timesync,sizeof(timesync));
                         nodeCmdConfig(timesync);
                         debug_printf("Time Sync Again!\r\n");
                     }
                     else
-            	    {
                         i++;
-            	    }
-                }
-                if(Data_Up == 2) //整分钟上传
-                {
-                    debug_printf("Minutes Update.\r\n");
-                    UpData();
                 }
             }
         }
@@ -369,7 +377,6 @@ int LoRaWAN_Func_Process(void)
     default:
         LCD_ShowString(30,120,"Press KEY2 TO",BLUE);
         LCD_ShowString(30,150,"ENTER PROJECT MODE",BLUE);
-        return 0;
     }
     return 0;
 }
@@ -398,24 +405,13 @@ void LoRaWAN_Borad_Info_Print(void)
 
 void SetLocalTime(uint8_t time[30])
 {
-	local_time[0] = atoi((char *)time);
-	local_time[1] = atoi((char *)time + 3);
-	local_time[2] = atoi((char *)time + 6);
-	local_time[3] = atoi((char *)time + 9);
-	local_time[4] = atoi((char *)time + 12);
-	local_time[5] = atoi((char *)time + 15);
+	for(int j = 0;j <= 5;j++)
+	{
+		local_time[j] = atoi((char *)time + 3 * j);
+	}
 	debug_printf("LocalTime:");
 	debug_printf("20%02d.%02d.%02d  ",local_time[0],local_time[1],local_time[2]);
-//	for(int j = 0;j < 2;j++)
-//	{
-//		debug_printf("%02d.",local_time[j]);
-//	}
-//	debug_printf("%02d  ",local_time[2]);
-	for(int j = 3;j < 5;j++)
-	{
-		debug_printf("%02d:",local_time[j]);
-	}
-	debug_printf("%02d\r\n",local_time[5]);
+	debug_printf("%02d:%02d:%02d",local_time[3],local_time[4],local_time[5]);
 }
 
 void UpData()
@@ -450,8 +446,8 @@ void UpData()
 	}
 	debug_printf("Sending...\r\n");
 	nodeDataCommunicate((uint8_t *)send_buf,13,&pphead);
-	debug_printf("Update Complete\r\n");
-
+	debug_printf("Update Complete!\r\n");
+//  LEDWAKE_ON;
 }
 
 void LCD_ShowInfo(void)
@@ -491,5 +487,4 @@ void LCD_ShowInfo(void)
 	}
 	else
 		LCD_ShowString(140,168,"N",BLUE);
-
 }

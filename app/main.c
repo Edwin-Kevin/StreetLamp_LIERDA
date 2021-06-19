@@ -94,18 +94,18 @@ int main(void)
     /** 开发板信息打印 */
     LoRaWAN_Borad_Info_Print();
 		
-		LCD_Clear(WHITE);
+    LCD_Clear(WHITE);
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE  */
     while (1)
     {
-      Status = LoRaWAN_Func_Process();
-			if(Status == 1)
-			{
-				debug_printf("System Halted!\r\n");
-				break;
-			}
+        Status = LoRaWAN_Func_Process();
+        if(Status == 1)
+        {
+            debug_printf("System Halted!\r\n");
+            break;
+        }
     }
 }
 
